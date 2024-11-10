@@ -5,13 +5,13 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.Log;
-
-import com.google.firebase.Firebase;
+import java.util.concurrent.Semaphore;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
-public class Car {
+public class Car extends Thread{
     private String name;
     private int x;
     private int y;
@@ -30,15 +30,28 @@ public class Car {
     private int penalidade = 0;
     private int velocidadeAlvo; // Velocidade que o carro tenta alcançar
     private int velocidadeMaxima; // Defina a velocidade máxima aqui
+    private Bitmap pista;
+    private boolean isRunning = true;  // Variável de controle para a thread
+    private MainActivity mainActivity; // Referência à MainActivity
+    // Cria um semáforo com 1 permissão para acesso exclusivo
+    private final Semaphore semaforo = new Semaphore(1);
+    private static final Semaphore areaCriticaSemaphore = new Semaphore(1); // Limite de um carro por vez
+    // Definindo os limites da área crítica (exemplo)
+    private static final int CRITICAL_AREA_START_X = 900;  // Posição X inicial
+    private static final int CRITICAL_AREA_END_X = 1300;    // Posição X final
+    private static final int CRITICAL_AREA_START_Y = 1700;   // Posição Y inicial
+    private static final int CRITICAL_AREA_END_Y = 1900;
+    private boolean naAreaCritica = false;// Posição Y final
 
 
 
-    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,Paint corCarro) {
+    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,Paint corCarro, Bitmap pista, MainActivity main) {
         this.name = name;
         this.x = x;
         this.y = y;
         this.angulo = angulo;
         this.carroBitmap = carroBitmap;
+        this.pista = pista;
         this.carSize = carSize;
         this.corCarro = corCarro;
         altura=carroBitmap.getHeight();
@@ -46,19 +59,51 @@ public class Car {
         this.velocidade=velocidade;
         this.velocidadeAlvo = velocidade; // Inicializa a velocidade alvo com a velocidade inicial
         this.velocidadeMaxima = velocidade; // Defina a velocidade máxima aqui
+        this.mainActivity = main;
         criarSensores();
     }
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                // Verifica se o carro deve entrar na área crítica e obtém permissão
+                if (!naAreaCritica && deveEntrarNaAreaCritica()) {
+                    areaCriticaSemaphore.acquire();
+                    naAreaCritica = true; // Indica que o carro está na área crítica
+                    Log.d("Car", "Entrou na área crítica.");
+                }
 
-    public void moverCarro(Bitmap tempBitmap, Canvas canvas) {
+                // Atualiza a posição do carro
+                moverCarro();
+
+                // Verifica colisões após a atualização de posição
+                resolverColisao();
+
+                // Verifica se o carro saiu da área crítica para liberar o semáforo
+                if (naAreaCritica && saiuDaAreaCritica()) {
+                    areaCriticaSemaphore.release();
+                    naAreaCritica = false; // Indica que o carro saiu da área crítica
+                    Log.d("Car", "Saiu da área crítica.");
+                }
+
+                // Pausa para simular a atualização da posição em intervalos
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                break; // Encerra a thread em caso de interrupção
+            }
+        }
+    }
+
+    public void moverCarro() {
         //Calcula o centro de massa da área mapeada a frente do carro
-        int[] centroMassa = calcularCentroMassa(tempBitmap);
-        Log.e("COORDS CENTROIDE", "COORDS CENTROIDE: " + centroMassa[0] + " " + centroMassa[1] );
+        int[] centroMassa = calcularCentroMassa();
+        //Log.e("COORDS CENTROIDE", "COORDS CENTROIDE: " + centroMassa[0] + " " + centroMassa[1] );
 
-        desenharCentroMassa(canvas, centroMassa[0], centroMassa[1]);
+        //desenharCentroMassa(canvas, centroMassa[0], centroMassa[1]);
 
         //Faz a rotação do carro buscando virar a frente do carro para o centro de massa
         rotacionarCarroParaCentroMassa(centroMassa);
-
         //Armazena a coordenada atual do carro
         xAnterior = x;
         yAnterior = y;
@@ -70,15 +115,15 @@ public class Car {
         y += Math.sin(angulo) * velocidade;
     }
 
-    private int[] calcularCentroMassa(Bitmap tempBitmap) {
+    private int[] calcularCentroMassa() {
 
         int somaX = 0, somaY = 0, validos = 0;
         //acessa a coordenada do sensor e verifica se a cor do pixel não é preta
         for (Sensor sensor : sensores) {
-            int[] coordSensor =sensor.getSensorCoords(x, y, angulo, carSize, tempBitmap);
+            int[] coordSensor =sensor.getSensorCoords(x, y, angulo, carSize, pista);
             int peso=sensor.getDistSensorDinam();
-            int pixel = tempBitmap.getPixel(coordSensor[0], coordSensor[1]);
-            Log.e("COORDS SENSOR", "COORDS SENSOR: " + coordSensor[0] + " " + coordSensor[1] + " " + pixel);
+            int pixel = pista.getPixel(coordSensor[0], coordSensor[1]);
+            // Log.e("COORDS SENSOR", "COORDS SENSOR: " + coordSensor[0] + " " + coordSensor[1] + " " + pixel);
             if (pixel != Color.BLACK) {  // Sensor detecta pista válida
                 somaX += (coordSensor[0]*peso);
                 somaY += (coordSensor[1]*peso);
@@ -122,88 +167,99 @@ public class Car {
 
     }
 
-    protected void resolverColisao(Car carro, List<Car> carros, Bitmap pistaBitmap) {
-        int distanciaMinima = carSize+2; // Distância mínima segura entre os carros
+    private void resolverColisao() {
+        int distanciaMinima = carSize + 2; // Distância mínima segura entre os carros
         double distanciaDesvio = carSize * 2; // Distância para começar a desviar
         int ajuste = 3; // Valor de ajuste de posição em pixels
 
-        for (Car outroCarro : carros) {
-            if (outroCarro != carro) {
-                double distancia = calcularDistancia(carro, outroCarro);
-                // 1. Calcula o vetor entre os centros dos carros
-                double dx = outroCarro.getX() - carro.getX();
-                double dy = outroCarro.getY() - carro.getY();
+        List<Car> carros = mainActivity.getCarros();
+
+        if (mainActivity == null || carros == null) {
+            Log.e("Car", "MainActivity ou lista de carros está nula");
+            return;
+        }
+
+        // Copia a lista de carros para evitar ConcurrentModificationException
+        List<Car> carrosCopia;
+        try {
+            semaforo.acquire();
+            carrosCopia = new ArrayList<>(carros); // Cria uma cópia local da lista de carros
+        } catch (InterruptedException e) {
+            Log.e("Car", "Erro ao adquirir semáforo: " + e.getMessage());
+            return;
+        } finally {
+            semaforo.release();
+        }
+
+        for (Car outroCarro : carrosCopia) {
+            if (outroCarro != this) {
+                double distancia = calcularDistancia(this, outroCarro);
+                double dx = outroCarro.getX() - this.getX();
+                double dy = outroCarro.getY() - this.getY();
 
                 if (distancia < distanciaMinima) {
-                    // Incrementa a penalidade para ambos os carros na colisão
-                    carro.penalidade++;
+                    this.penalidade++;
                     outroCarro.penalidade++;
 
-
-                    // Calcula a distância entre os carros
                     double distanciaEntreCarros = Math.sqrt(dx * dx + dy * dy);
-
-                    // Calcula a sobreposição
                     double sobreposicao = distanciaMinima - distanciaEntreCarros;
 
                     if (sobreposicao > 0) {
-                        // Normaliza o vetor de colisão
                         dx /= distanciaEntreCarros;
                         dy /= distanciaEntreCarros;
 
-                        // Calcula o deslocamento para cada carro, considerando o 'ajuste'
                         double deslocamentoX = dx * (sobreposicao / 2.0 + ajuste);
                         double deslocamentoY = dy * (sobreposicao / 2.0 + ajuste);
 
-                        // Move os carros para longe um do outro
-                        carro.setX(carro.getX() - (int) deslocamentoX);
-                        carro.setY(carro.getY() - (int) deslocamentoY);
-
+                        this.setX(this.getX() - (int) deslocamentoX);
+                        this.setY(this.getY() - (int) deslocamentoY);
                         outroCarro.setX(outroCarro.getX() + (int) deslocamentoX);
                         outroCarro.setY(outroCarro.getY() + (int) deslocamentoY);
 
-
-                        //Ajusta a velocidade após a colisão, para que não fiquem "tremendo"
-                        if (carro.velocidade > outroCarro.velocidade) {
-                            carro.velocidade = outroCarro.velocidade; //Define a velocidade para um valor seguro, não para a velocidade máxima
-
+                        if (this.velocidade > outroCarro.velocidade) {
+                            this.velocidade = outroCarro.velocidade;
                         }
                     }
-
-
-
                 } else if (distancia < distanciaDesvio) {
-                    // 2. Se estiver perto, mas não colidindo, aplique um pequeno ajuste de posição
-                    double deslocamentoX = dx * ajuste / distancia; // Ajuste proporcional à distância
+                    double deslocamentoX = dx * ajuste / distancia;
                     double deslocamentoY = dy * ajuste / distancia;
 
-                    carro.setX(carro.getX() - (int) deslocamentoX);
-                    carro.setY(carro.getY() - (int) deslocamentoY);
-
+                    this.setX(this.getX() - (int) deslocamentoX);
+                    this.setY(this.getY() - (int) deslocamentoY);
                     outroCarro.setX(outroCarro.getX() + (int) deslocamentoX);
                     outroCarro.setY(outroCarro.getY() + (int) deslocamentoY);
-                    // Verifica se há espaço para desviar
-                    boolean esquerdaLivre1 = carro.sensores.get(1).verificarSensorLivre(pistaBitmap, carro.x, carro.y, carro.angulo, carSize); // Sensor esquerdo
-                    boolean direitaLivre1 = carro.sensores.get(5).verificarSensorLivre(pistaBitmap, carro.x, carro.y, carro.angulo, carSize); // Sensor direito
-                    boolean esquerdaLivre2 = carro.sensores.get(2).verificarSensorLivre(pistaBitmap, carro.x, carro.y, carro.angulo, carSize); // Sensor esquerdo
-                    boolean direitaLivre2 = carro.sensores.get(5).verificarSensorLivre(pistaBitmap, carro.x, carro.y, carro.angulo, carSize); // Sensor direito
 
-                    if (!esquerdaLivre1 || !direitaLivre1 || !esquerdaLivre2 && !direitaLivre2) { // Nenhum lado livre, reduza a velocidade
-                        carro.velocidadeAlvo = Math.min(outroCarro.velocidade, carro.velocidadeMaxima);
+                    boolean esquerdaLivre1 = this.sensores.get(1).verificarSensorLivre(pista, this.x, this.y, this.angulo, carSize);
+                    boolean direitaLivre1 = this.sensores.get(5).verificarSensorLivre(pista, this.x, this.y, this.angulo, carSize);
+                    boolean esquerdaLivre2 = this.sensores.get(2).verificarSensorLivre(pista, this.x, this.y, this.angulo, carSize);
+                    boolean direitaLivre2 = this.sensores.get(5).verificarSensorLivre(pista, this.x, this.y, this.angulo, carSize);
+
+                    if (!esquerdaLivre1 || !direitaLivre1 || !esquerdaLivre2 && !direitaLivre2) {
+                        this.velocidadeAlvo = Math.min(outroCarro.velocidade, this.velocidadeMaxima);
                     }
-
-
-                } else if(carroSaiuDaPista(carro, pistaBitmap)){ // Verifica colisão com a borda da pista
-                    carro.penalidade++;
-                    // reposicionarCarroNaPista(carro, pistaBitmap); // Se quiser reposicionar o carro
-                }
-                else{
-                    // Se o carro da frente estiver longe, mantenha a velocidade máxima
-                    carro.velocidadeAlvo = carro.velocidadeMaxima;
+                } else if (carroSaiuDaPista(this, pista)) {
+                    this.penalidade++;
+                } else {
+                    this.velocidadeAlvo = this.velocidadeMaxima;
                 }
             }
         }
     }
+
+    // Método que verifica se o carro deve entrar na área crítica
+    private boolean deveEntrarNaAreaCritica() {
+        return this.getX() >= CRITICAL_AREA_START_X && this.getX() <= CRITICAL_AREA_END_X &&
+                this.getY() >= CRITICAL_AREA_START_Y && this.getY() <= CRITICAL_AREA_END_Y;
+    }
+
+    // Método que libera o semáforo ao sair da área crítica
+    private boolean saiuDaAreaCritica() {
+        // Verifica se o carro está fora dos limites da área crítica
+        return this.x < CRITICAL_AREA_START_X || this.x > CRITICAL_AREA_END_X ||
+                this.y < CRITICAL_AREA_START_Y || this.y > CRITICAL_AREA_END_Y;
+    }
+
+
 
     private boolean carroSaiuDaPista(Car carro, Bitmap pistaBitmap) {
         int x = carro.x + carro.carroBitmap.getWidth() / 2;
@@ -306,7 +362,6 @@ public class Car {
         canvas.restore();
     }
 
-
     private double normalizarAngulo(double angulo) {
         while (angulo > Math.PI) angulo -= 2 * Math.PI;
         while (angulo < -Math.PI) angulo += 2 * Math.PI;
@@ -321,9 +376,6 @@ public class Car {
     }
     public int getVoltasCompletadas() {
         return voltasCompletadas;
-    }
-    public String getName() {
-        return name;
     }
     public int getAltura() {
         return altura;
@@ -355,6 +407,7 @@ public class Car {
     public void setCruzouLinha(boolean cruzouLinha) {
         this.cruzouLinha = cruzouLinha;
     }
+
     private void desenharCentroMassa(Canvas canvas, int centroMassaX, int centroMassaY) {
         Paint paint = new Paint();
         paint.setColor(Color.RED);
@@ -367,6 +420,9 @@ public class Car {
         canvas.drawLine(centroMassaX - tamanhoX, centroMassaY - tamanhoX, centroMassaX + tamanhoX, centroMassaY + tamanhoX, paint);
         canvas.drawLine(centroMassaX - tamanhoX, centroMassaY + tamanhoX, centroMassaX + tamanhoX, centroMassaY - tamanhoX, paint);
 
+    }
+    public void setPistaAtualizada(Bitmap pistaAtualizada) {
+        this.pista = pistaAtualizada;
     }
 
 

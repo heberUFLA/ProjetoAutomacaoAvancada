@@ -51,10 +51,10 @@ public class Sensor {
         limite = true;
         int pixel = tempBitmap.getPixel(sensorCoords[0], sensorCoords[1]);
         if (pixel != Color.BLACK) {
-            Log.e("COR", name+ ": ENXERGO BRANCO");
+            //Log.e("COR", name+ ": ENXERGO BRANCO");
             pixelBlack=false;
         }else{
-            Log.e("COR", name + ": ENXERGO PRETO");
+            //Log.e("COR", name + ": ENXERGO PRETO");
             pixelBlack=true;
         }
 

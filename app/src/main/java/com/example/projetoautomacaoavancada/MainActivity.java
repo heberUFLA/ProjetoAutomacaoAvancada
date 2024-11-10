@@ -17,14 +17,15 @@ import android.graphics.Paint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 public class MainActivity extends Activity {
     private ImageView pistaImageView;
     private TextView cronometroTextView, voltasTextView, carrosEditText, rankingTextView;
     private Button startButton, pauseButton, finishButton;
     private List<Car> carros = new ArrayList<>();
-    private int startX = 1300;
-    private int startY = 1900;
+    private int startX = 1400;
+    private int startY = 1800;
     private int carSize = 40;
     private boolean isRunning = false;
     private Bitmap pistaBitmap, mutablePistaBitmap,originalCarroBitmap;
@@ -83,7 +84,6 @@ public class MainActivity extends Activity {
                 isRunning = true;
                 startTime = SystemClock.elapsedRealtime();
                 startSimulation();
-
             }
 
         });
@@ -103,11 +103,12 @@ public class MainActivity extends Activity {
 
         //Cria o objeto carro, Passando como parâmetro Nome (pega o número do for onde está sendo criado os carros), a posição inicial X e Y,
         // tamanho do carro que inicialmente pega o valor original da imagem do carro, bitmap do carro, angulo inicial e velocidade e a cor gerada aleatoriamente.
-        Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,paint);
+        Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,paint,pistaBitmap,this);
 
 
         //Adiciona o carro à lista de carros
         carros.add(novoCarro);
+        novoCarro.start();
     }
 
     private void pauseRace() {
@@ -132,7 +133,7 @@ public class MainActivity extends Activity {
             simulationThread = new Thread(() -> {
                 while (isRunning) {
                     try {
-                        Thread.sleep(50);  // Atualiza a cada 50ms
+                        Thread.sleep(30);  // Atualiza a cada 50ms
                         runOnUiThread(() -> {
                             Bitmap tempBitmap = Bitmap.createBitmap(
                                     pistaBitmap.getWidth(), pistaBitmap.getHeight(), Bitmap.Config.ARGB_8888
@@ -140,9 +141,14 @@ public class MainActivity extends Activity {
                             Canvas tempCanvas = new Canvas(tempBitmap);
                             tempCanvas.drawBitmap(pistaBitmap, 0, 0, null);
 
-                            atualizarCarros(tempBitmap, tempCanvas);
                             desenharLinhaChegada(tempCanvas, tempBitmap);
+                            atualizarCarros(tempCanvas);
+
                             pistaImageView.setImageBitmap(tempBitmap);
+
+                            for (Car carro : carros) {
+                                carro.setPistaAtualizada(tempBitmap); // Adicione esse método na classe Car
+                            }
 
                             verificarLinhaDeContagem();  // Verifica se cruzou a linha
                             atualizarCronometro();  // Atualiza cronômetro
@@ -158,17 +164,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void atualizarCarros(Bitmap tempBitmap, Canvas tempCanvas) {
+    private void atualizarCarros(Canvas tempCanvas) {
         for (Car carro : carros) {
-            // Movimenta o carro
-            carro.moverCarro(tempBitmap,tempCanvas);
-
-            //Calcula a distancia dos pixels que percorreu
-            carro.calcularDistancia();
-
-            // Verifica e resolve colisões
-            carro.resolverColisao(carro, carros,tempBitmap);
-
             // Desenha o carro na nova posição
             carro.desenharCarro(tempCanvas);
         }
@@ -214,7 +211,7 @@ public class MainActivity extends Activity {
 
         for (Car carro : carros) {
             // Se o carro passar pelo ponto de partida e completou uma volta
-            if (Math.abs(carro.getX() - startX) < 30 && Math.abs(carro.getY() - startY) < 200) {
+            if (Math.abs(carro.getX() - startX) < 40 && Math.abs(carro.getY() - startY) < 300) {
                 if (!carro.getCruzouLinha()) {  // Verifica se o carro já contou uma volta nesta passagem
                     carro.setVoltasCompletadas(carro.getVoltasCompletadas() + 1);  // Incrementa o contador de voltas
                     carro.setCruzouLinha(true);  // Marca que essa volta foi contada
@@ -236,10 +233,15 @@ public class MainActivity extends Activity {
         // Desenhar a linha vertical amarela
         Paint paint = new Paint();
         paint.setColor(Color.YELLOW);
-        paint.setStrokeWidth(7);
+        paint.setStrokeWidth(10);
+        Paint paint2 = new Paint();
+        paint2.setColor(Color.GREEN);
+        paint2.setStrokeWidth(10);
 
-        int xLine = 1330;  // Coordenada X fixa para a linha vertical
-        canvas.drawLine(xLine, 1800, xLine, 1990, paint);
+        int xLine = 1550;  // Coordenada X fixa para a linha vertical
+        canvas.drawLine(xLine, 1700, xLine, 1900, paint);
+        canvas.drawLine(900, 1700, 900, 1900, paint2);
+        canvas.drawLine(1300, 1700, 1300, 1900, paint2);
 
         pistaImageView.setImageBitmap(mutablePistaBitmap);
     }
@@ -247,6 +249,9 @@ public class MainActivity extends Activity {
     private int getRandomColor() {
         Random rand = new Random();
         return Color.rgb(rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
+    }
+    public List<Car> getCarros() {
+        return carros; // Retorna a lista de carros
     }
 
 }
