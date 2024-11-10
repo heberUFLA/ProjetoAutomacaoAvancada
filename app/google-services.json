@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "638300720837",
+    "project_id": "projetoautomacaoavancada",
+    "storage_bucket": "projetoautomacaoavancada.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638300720837:android:295729843b026648236aac",
+        "android_client_info": {
+          "package_name": "com.example.projetoautomacaoavancada"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxmaXecN_ASuDBbGt3UWu9n16mD4vkrvE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
