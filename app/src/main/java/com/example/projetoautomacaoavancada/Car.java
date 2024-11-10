@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.Log;
 
+import com.google.firebase.Firebase;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -83,7 +85,6 @@ public class Car {
                 validos+=peso;
             }
         }
-
 
         if (validos > 0) {
             return new int[]{somaX / validos, somaY / validos};
@@ -370,4 +371,3 @@ public class Car {
 
 
 }
-

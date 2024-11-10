@@ -83,6 +83,7 @@ public class MainActivity extends Activity {
                 isRunning = true;
                 startTime = SystemClock.elapsedRealtime();
                 startSimulation();
+
             }
 
         });
