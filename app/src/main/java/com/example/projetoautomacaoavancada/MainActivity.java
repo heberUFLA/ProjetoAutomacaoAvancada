@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
     private Thread simulationThread;
     private long startTime;  // Armazena o tempo de início da corrida
     private double anguloInicial = 0;
+    private CorridaManager corridaManager;
 
 
 
@@ -52,6 +53,8 @@ public class MainActivity extends Activity {
         pauseButton = findViewById(R.id.pauseButton);
         finishButton = findViewById(R.id.finishButton);
         inicializarPista();
+        // Inicializa o CorridaManager
+        corridaManager = new CorridaManager();
 
         startButton.setOnClickListener(v -> startRace());
         pauseButton.setOnClickListener(v -> pauseRace());
@@ -76,18 +79,26 @@ public class MainActivity extends Activity {
                     Log.e("MainActivity", "Erro ao carregar o bitmap.");
                     return; // Sai se o bitmap não for carregado
                 }
-                for (int i = 0; i < numCarros; i++) {
-                    adicionarCarro(i);
-                }
 
-                // Iniciar a simulação após adicionar os carros
-                isRunning = true;
-                startTime = SystemClock.elapsedRealtime();
-                startSimulation();
+                // Carregar o estado dos carros do Firestore
+                corridaManager.carregarEstadoDosCarros(carrosRecuperados -> {
+                    carros = carrosRecuperados;
+                    if (carros.isEmpty()) {
+                        // Se não há carros no Firestore, cria novos carros
+                        for (int i = 0; i < numCarros; i++) {
+                            adicionarCarro(i);
+                        }
+                    }
+
+                    // Iniciar a simulação após adicionar ou carregar os carros
+                    isRunning = true;
+                    startTime = SystemClock.elapsedRealtime();
+                    startSimulation();
+                });
             }
-
         });
     }
+
     private void adicionarCarro(int index) {
         int posX = startX - (index / 2) * 50; // Alterna entre 2 filas
         int posY = startY - (index % 2) * 30;  // Desloca para cima para a segunda fila
@@ -121,10 +132,16 @@ public class MainActivity extends Activity {
         }
     }
 
+
     private void finishRace() {
         isRunning = false;
         resetarCronometro();
+        for (Car carro : carros){
+            carro.interrupt();
+        }
+        corridaManager.salvarEstadoDosCarros(carros); // Salva o estado dos carros ao finalizar
         carros.clear();  // Remove todos os carros da lista
+
         inicializarPista();  // Redesenha a pista limpa
     }
 

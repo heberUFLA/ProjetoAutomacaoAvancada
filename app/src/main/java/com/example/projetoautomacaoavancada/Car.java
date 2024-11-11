@@ -8,7 +8,6 @@ import android.util.Log;
 import java.util.concurrent.Semaphore;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class Car extends Thread{
@@ -426,4 +425,63 @@ public class Car extends Thread{
     }
 
 
+    public void setVelocidade(int velocidade) {
+        this.velocidade = velocidade;
+    }
+
+    public void setPenalidade(int penalidade) {
+        this.penalidade = penalidade;
+    }
+
+    public void setAngulo(Double angulo) {
+        this.angulo = angulo;
+    }
+
+    public Object getAngulo() {
+        return angulo;
+    }
+
+    public String getCarId() {
+        return name;
+    }
+
+    public void setCarId(String carId) {
+        this.name = carId;
+    }
+
+    public int getCarSize() {
+        return carSize;
+    }
+
+    public Paint getCorCarro() {
+        return corCarro;
+    }
+
+    public void setCorCarro(Paint corCarro) {
+        this.corCarro = corCarro;
+    }
+
+    public Bitmap getCarroBitmap() {
+        return carroBitmap;
+    }
+
+    public Object getPista() {
+        return pista;
+    }
+
+    public Object getMainActivity() {
+        return mainActivity;
+    }
+
+    public double getDistanciaPercorrida() {
+        return distanciaPercorrida;
+    }
+
+    public void setDistanciaPercorrida(int distanciaPercorrida) {
+        this.distanciaPercorrida = distanciaPercorrida;
+    }
+
+    public void setCarroBitmap(Bitmap carroBitmap) {
+        this.carroBitmap = carroBitmap;
+    }
 }
