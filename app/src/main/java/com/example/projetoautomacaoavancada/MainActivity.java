@@ -14,6 +14,12 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.graphics.Paint;
+
+import androidx.annotation.NonNull;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -89,6 +95,23 @@ public class MainActivity extends Activity {
                             adicionarCarro(i);
                         }
                     }
+                    else{
+                        for(Car carro : carros){
+                            carro.setCarroBitmap(Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false));
+                            carro.setPistaAtualizada(pistaBitmap);
+                            carro.setMainActivity(this);
+                            // Se a thread não estiver em execução, inicie-a
+                            if (!carro.isAlive()) {
+                                carro.start(); // Inicia a thread do carro
+                            }
+                        }
+                        if(carros.size()<numCarros) {
+                            for (int i = carros.size(); i < numCarros; i++) {
+                                adicionarCarro(i);
+                            }
+                        }
+
+                    }
 
                     // Iniciar a simulação após adicionar ou carregar os carros
                     isRunning = true;
@@ -106,15 +129,12 @@ public class MainActivity extends Activity {
         //Velocidade aleatória para cada carro criado no inicio
         int velocidade = (int) (Math.random() * (40 - 15) + 15);
 
-        //Objeto onde será armazenada a cor aleatória do carro
-        Paint paint = new Paint();
-        paint.setColorFilter(new PorterDuffColorFilter(getRandomColor(), PorterDuff.Mode.SRC_IN));
         //Redimensiona o bitmap do carro para o tamanho desejado
         Bitmap auxBitmap = Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false);
 
         //Cria o objeto carro, Passando como parâmetro Nome (pega o número do for onde está sendo criado os carros), a posição inicial X e Y,
         // tamanho do carro que inicialmente pega o valor original da imagem do carro, bitmap do carro, angulo inicial e velocidade e a cor gerada aleatoriamente.
-        Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,paint,pistaBitmap,this);
+        Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
 
 
         //Adiciona o carro à lista de carros
@@ -136,14 +156,33 @@ public class MainActivity extends Activity {
     private void finishRace() {
         isRunning = false;
         resetarCronometro();
-        for (Car carro : carros){
-            carro.interrupt();
-        }
-        corridaManager.salvarEstadoDosCarros(carros); // Salva o estado dos carros ao finalizar
-        carros.clear();  // Remove todos os carros da lista
 
-        inicializarPista();  // Redesenha a pista limpa
+        // Interrompe as threads dos carros
+        for (Car carro : carros) {
+            carro.interrupt();
+            carro.liberarSemaforos();
+        }
+
+        // Limpar dados no Firestore antes de salvar novos dados
+        corridaManager.limparDadosCorrida(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                if (task.isSuccessful()) {
+                    Log.d("Firestore", "Dados antigos limpos com sucesso!");
+
+                    // Agora que os dados foram excluídos, podemos salvar o estado dos carros
+                    corridaManager.salvarEstadoDosCarros(carros);
+
+                    // Limpar a lista de carros e redesenhar a pista
+                    carros.clear();
+                    inicializarPista();
+                } else {
+                    Log.e("Firestore", "Erro ao limpar dados antes de salvar os novos.", task.getException());
+                }
+            }
+        });
     }
+
 
     private void startSimulation() {
         if (simulationThread == null || !simulationThread.isAlive()) {
@@ -198,7 +237,7 @@ public class MainActivity extends Activity {
         StringBuilder ranking = new StringBuilder("Ranking:\n");
         for (int i = 0; i < carros.size(); i++) {
             Car carro = carros.get(i);
-            ranking.append((i + 1)).append("º ").append(carro.getName())
+            ranking.append((i + 1)).append("º ").append(carro.getNome())
                     .append(": ").append(carro.getVoltasCompletadas()).append(" voltas, Speed: ").append(carro.getVelocidade()).append(", Penalidade: ").append(carro.getPenalidade()).append("\n");
         }
 
@@ -256,9 +295,9 @@ public class MainActivity extends Activity {
         paint2.setStrokeWidth(10);
 
         int xLine = 1550;  // Coordenada X fixa para a linha vertical
-        canvas.drawLine(xLine, 1700, xLine, 1900, paint);
-        canvas.drawLine(900, 1700, 900, 1900, paint2);
-        canvas.drawLine(1300, 1700, 1300, 1900, paint2);
+        canvas.drawLine(xLine, 1800, xLine, 1990, paint);
+        canvas.drawLine(1000, 1800, 1000, 1990, paint2);
+        canvas.drawLine(1200, 1800, 1200, 1990, paint2);
 
         pistaImageView.setImageBitmap(mutablePistaBitmap);
     }

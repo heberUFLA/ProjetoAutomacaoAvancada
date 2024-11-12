@@ -4,6 +4,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.util.Log;
 import java.util.concurrent.Semaphore;
 
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Car extends Thread{
+    private final int corOriginalCarro;
     private String name;
     private int x;
     private int y;
@@ -23,7 +26,7 @@ public class Car extends Thread{
     private int voltasCompletadas=0;
     private int altura,largura;// Controle para evitar contagens repetidas
     private boolean cruzouLinha = false;// Controle de estado para a volta
-    private Paint corCarro;
+    private Paint corCarro = new Paint();
     private int xAnterior, yAnterior = 0;
     private int distanciaPercorrida = 0;
     private int penalidade = 0;
@@ -44,7 +47,7 @@ public class Car extends Thread{
 
 
 
-    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,Paint corCarro, Bitmap pista, MainActivity main) {
+    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,int IDcorCarro, Bitmap pista, MainActivity main) {
         this.name = name;
         this.x = x;
         this.y = y;
@@ -52,7 +55,8 @@ public class Car extends Thread{
         this.carroBitmap = carroBitmap;
         this.pista = pista;
         this.carSize = carSize;
-        this.corCarro = corCarro;
+        this.corOriginalCarro = IDcorCarro;
+        this.corCarro.setColorFilter(new PorterDuffColorFilter(IDcorCarro, PorterDuff.Mode.SRC_IN));
         altura=carroBitmap.getHeight();
         largura=carroBitmap.getWidth();
         this.velocidade=velocidade;
@@ -84,6 +88,7 @@ public class Car extends Thread{
                     naAreaCritica = false; // Indica que o carro saiu da área crítica
                     Log.d("Car", "Saiu da área crítica.");
                 }
+                calcularDistanciaPercorrida();
 
                 // Pausa para simular a atualização da posição em intervalos
                 Thread.sleep(50);
@@ -310,7 +315,7 @@ public class Car extends Thread{
     }
 
 
-    public void calcularDistancia() {
+    public void calcularDistanciaPercorrida() {
         //Calcula a distancia percorrida com base no princípio da distancia entre dois pontos
         distanciaPercorrida += (int)(Math.sqrt(Math.pow(x - xAnterior, 2) + Math.pow(y - yAnterior, 2)));
     }
@@ -356,7 +361,7 @@ public class Car extends Thread{
         canvas.rotate((float) Math.toDegrees(angulo), centroCarroX, centroCarroY);
 
         // Desenha o bitmap do carro na posição original (x, y) sem translação adicional
-        canvas.drawBitmap(carroBitmap, x, y, corCarro); // Remove a translação desnecessária
+        canvas.drawBitmap(carroBitmap, x, y, corCarro);
 
         canvas.restore();
     }
@@ -368,6 +373,10 @@ public class Car extends Thread{
     }
     public int getVelocidadeMaxima() {
         return 40; // ou qualquer outro valor que represente a velocidade máxima do carro.
+    }
+
+    public String getNome(){
+        return name;
     }
 
     public int getVelocidade() {
@@ -405,6 +414,16 @@ public class Car extends Thread{
     }
     public void setCruzouLinha(boolean cruzouLinha) {
         this.cruzouLinha = cruzouLinha;
+    }
+
+    public void liberarSemaforos() {
+        if (semaforo.availablePermits() == 0) {
+            semaforo.release();
+        }
+        if (areaCriticaSemaphore.availablePermits() == 0) {
+            areaCriticaSemaphore.release();
+        }
+
     }
 
     private void desenharCentroMassa(Canvas canvas, int centroMassaX, int centroMassaY) {
@@ -483,5 +502,13 @@ public class Car extends Thread{
 
     public void setCarroBitmap(Bitmap carroBitmap) {
         this.carroBitmap = carroBitmap;
+    }
+
+    public void setMainActivity(MainActivity mainActivity) {
+        this.mainActivity = mainActivity;
+    }
+
+    public int getOriginalColor() {
+        return corOriginalCarro;
     }
 }
