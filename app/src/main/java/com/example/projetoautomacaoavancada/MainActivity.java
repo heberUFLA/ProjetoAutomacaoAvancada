@@ -5,8 +5,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
@@ -23,7 +21,9 @@ import com.google.android.gms.tasks.Task;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Semaphore;
+import com.example.bibliotecaavancada.EstadosCar;
+import com.example.bibliotecaavancada.FireBase;
+
 
 public class MainActivity extends Activity {
     private ImageView pistaImageView;
@@ -34,12 +34,13 @@ public class MainActivity extends Activity {
     private int startY = 1800;
     private int carSize = 40;
     private boolean isRunning = false;
-    private Bitmap pistaBitmap, mutablePistaBitmap,originalCarroBitmap;
+    private Bitmap pistaBitmap, mutablePistaBitmap,originalCarroBitmap,auxBitmap;
     private Canvas canvas;
     private Thread simulationThread;
     private long startTime;  // Armazena o tempo de início da corrida
     private double anguloInicial = 0;
-    private CorridaManager corridaManager;
+
+    private List<EstadosCar> copiaEstadosCar = new ArrayList<>();
 
 
 
@@ -59,8 +60,9 @@ public class MainActivity extends Activity {
         pauseButton = findViewById(R.id.pauseButton);
         finishButton = findViewById(R.id.finishButton);
         inicializarPista();
-        // Inicializa o CorridaManager
-        corridaManager = new CorridaManager();
+        // Carrega o bitmap aqui para garantir que não está nulo
+        originalCarroBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.carro);
+        auxBitmap = Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false);
 
         startButton.setOnClickListener(v -> startRace());
         pauseButton.setOnClickListener(v -> pauseRace());
@@ -79,38 +81,32 @@ public class MainActivity extends Activity {
                 numCarros = Integer.parseInt(input);
                 carros.clear(); // Limpa a lista de carros
 
-                // Carrega o bitmap aqui para garantir que não está nulo
-                originalCarroBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.carro);
                 if (originalCarroBitmap == null) {
                     Log.e("MainActivity", "Erro ao carregar o bitmap.");
                     return; // Sai se o bitmap não for carregado
                 }
 
                 // Carregar o estado dos carros do Firestore
-                corridaManager.carregarEstadoDosCarros(carrosRecuperados -> {
-                    carros = carrosRecuperados;
+                copiaEstadosCar.clear();
+                FireBase.carregarEstadoDosCarros(carrosRecuperados -> {
+                    criarCarrosData(carrosRecuperados);
                     if (carros.isEmpty()) {
                         // Se não há carros no Firestore, cria novos carros
                         for (int i = 0; i < numCarros; i++) {
                             adicionarCarro(i);
                         }
-                    }
-                    else{
-                        for(Car carro : carros){
-                            carro.setCarroBitmap(Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false));
-                            carro.setPistaAtualizada(pistaBitmap);
-                            carro.setMainActivity(this);
+                    } else {
+                        for (Car carro : carros) {
                             // Se a thread não estiver em execução, inicie-a
                             if (!carro.isAlive()) {
                                 carro.start(); // Inicia a thread do carro
                             }
                         }
-                        if(carros.size()<numCarros) {
+                        if (carros.size() < numCarros) {
                             for (int i = carros.size(); i < numCarros; i++) {
                                 adicionarCarro(i);
                             }
                         }
-
                     }
 
                     // Iniciar a simulação após adicionar ou carregar os carros
@@ -121,7 +117,18 @@ public class MainActivity extends Activity {
             }
         });
     }
+    private void criarCarrosData(List<EstadosCar> estadosCars) {
+        for (EstadosCar es : estadosCars) {
 
+            Car novoCarro = new Car(es.getNome(), es.getX(), es.getY(), es.getCarSize(),auxBitmap,
+                    es.getAngulo(),es.getVelocidade(),es.getCorOriginalCarro(),pistaBitmap,this);
+            novoCarro.setVoltasCompletadas(es.getVoltasCompletadas());
+            novoCarro.setDistanciaPercorrida(es.getDistanciaPercorrida());
+            novoCarro.setPenalidade(es.getPenalidade());
+
+            carros.add(novoCarro);
+        }
+    }
     private void adicionarCarro(int index) {
         int posX = startX - (index / 2) * 50; // Alterna entre 2 filas
         int posY = startY - (index % 2) * 30;  // Desloca para cima para a segunda fila
@@ -132,8 +139,17 @@ public class MainActivity extends Activity {
         //Redimensiona o bitmap do carro para o tamanho desejado
         Bitmap auxBitmap = Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false);
 
+
         //Cria o objeto carro, Passando como parâmetro Nome (pega o número do for onde está sendo criado os carros), a posição inicial X e Y,
+
         // tamanho do carro que inicialmente pega o valor original da imagem do carro, bitmap do carro, angulo inicial e velocidade e a cor gerada aleatoriamente.
+
+        if(index==0){
+            SafetCar novoCarro = new SafetCar("Carro Seguro ", posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
+            carros.add(novoCarro);
+            novoCarro.setPriority(Thread.MAX_PRIORITY);
+            novoCarro.start();
+        }
         Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
 
 
@@ -144,11 +160,23 @@ public class MainActivity extends Activity {
 
     private void pauseRace() {
         isRunning = !isRunning;
+
         if (isRunning) {
             pauseButton.setText("Pause");
-            startSimulation();
+
+            // Retoma cada carro individualmente
+            for (Car carro : carros) {
+                carro.resumeCar(); // Retoma a thread de cada carro
+            }
+
+            startSimulation(); // Se necessário, continue a simulação (pode depender da sua lógica de início)
         } else {
             pauseButton.setText("Resume");
+
+            // Pausa cada carro individualmente
+            for (Car carro : carros) {
+                carro.pauseCar(); // Pausa a thread de cada carro
+            }
         }
     }
 
@@ -156,22 +184,25 @@ public class MainActivity extends Activity {
     private void finishRace() {
         isRunning = false;
         resetarCronometro();
-
-        // Interrompe as threads dos carros
-        for (Car carro : carros) {
+        for (Car carro : carros){
             carro.interrupt();
             carro.liberarSemaforos();
+            boolean isSafetCar = carro instanceof SafetCar;
+            EstadosCar estadosCar = new EstadosCar(carro.getNome(),carro.getX(),carro.getY(),carro.getCarSize(),carro.getCarroBitmap(),
+                    carro.getAngulo(),carro.getVelocidade(),carro.getCorOriginalCarro(),carro.getVoltasCompletadas(),
+                    carro.getDistanciaPercorrida(),carro.getPenalidade(),isSafetCar);
+            copiaEstadosCar.add(estadosCar);
         }
 
         // Limpar dados no Firestore antes de salvar novos dados
-        corridaManager.limparDadosCorrida(new OnCompleteListener<Void>() {
+        FireBase.limparDadosCorrida(new OnCompleteListener<Void>() {
             @Override
             public void onComplete(@NonNull Task<Void> task) {
                 if (task.isSuccessful()) {
                     Log.d("Firestore", "Dados antigos limpos com sucesso!");
 
                     // Agora que os dados foram excluídos, podemos salvar o estado dos carros
-                    corridaManager.salvarEstadoDosCarros(carros);
+                    FireBase.salvarEstadoDosCarros(copiaEstadosCar);
 
                     // Limpar a lista de carros e redesenhar a pista
                     carros.clear();
@@ -181,6 +212,7 @@ public class MainActivity extends Activity {
                 }
             }
         });
+
     }
 
 

@@ -1,20 +1,16 @@
 plugins {
-    alias(libs.plugins.android.application)
-    id("com.google.gms.google-services")
+    alias(libs.plugins.android.library)
 }
 
 android {
-    namespace = "com.example.projetoautomacaoavancada"
+    namespace = "com.example.bibliotecaavancada"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.projetoautomacaoavancada"
         minSdk = 29
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -33,22 +29,12 @@ android {
 }
 
 dependencies {
+
     implementation(libs.appcompat)
     implementation(libs.material)
-    implementation(libs.activity)
-    implementation(libs.constraintlayout)
-    implementation(libs.firebase.common)
-    implementation(project(":bibliotecaAvancada"))
+    implementation(libs.play.services.tasks)
+    implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
-    testImplementation(libs.junit.jupiter)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-
-    // Firebase BOM para gerenciamento de versões
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
-
-    // Firebase Firestore
-    implementation("com.google.firebase:firebase-firestore-ktx")
-
-    // Outras dependências necessárias
 }

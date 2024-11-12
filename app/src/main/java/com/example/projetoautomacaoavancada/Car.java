@@ -7,6 +7,9 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.util.Log;
+
+import com.example.bibliotecaavancada.Calculos;
+
 import java.util.concurrent.Semaphore;
 
 import java.util.ArrayList;
@@ -22,7 +25,7 @@ public class Car extends Thread{
     private int carSize;
     protected ArrayList<Sensor> sensores = new ArrayList<>();
     private Sensor sensorCentro, sensorEsquerda, sensorDireita, sensorEsquerdaDist, sensorDireitaDist;
-    private int velocidade;
+    protected int velocidade;
     private int voltasCompletadas=0;
     private int altura,largura;// Controle para evitar contagens repetidas
     private boolean cruzouLinha = false;// Controle de estado para a volta
@@ -30,8 +33,8 @@ public class Car extends Thread{
     private int xAnterior, yAnterior = 0;
     private int distanciaPercorrida = 0;
     private int penalidade = 0;
-    private int velocidadeAlvo; // Velocidade que o carro tenta alcançar
-    private int velocidadeMaxima; // Defina a velocidade máxima aqui
+    protected int velocidadeAlvo; // Velocidade que o carro tenta alcançar
+    protected int velocidadeMaxima; // Defina a velocidade máxima aqui
     private Bitmap pista;
     private boolean isRunning = true;  // Variável de controle para a thread
     private MainActivity mainActivity; // Referência à MainActivity
@@ -44,7 +47,7 @@ public class Car extends Thread{
     private static final int CRITICAL_AREA_START_Y = 1700;   // Posição Y inicial
     private static final int CRITICAL_AREA_END_Y = 1900;
     private boolean naAreaCritica = false;// Posição Y final
-
+    private boolean paused;
 
 
     public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,int IDcorCarro, Bitmap pista, MainActivity main) {
@@ -69,6 +72,12 @@ public class Car extends Thread{
     public void run() {
         while (true) {
             try {
+                synchronized (this) {
+                    while (paused) {
+                        wait(); // Pausa a thread enquanto o carro estiver em estado de pausa
+                    }
+                }
+
                 // Verifica se o carro deve entrar na área crítica e obtém permissão
                 if (!naAreaCritica && deveEntrarNaAreaCritica()) {
                     areaCriticaSemaphore.acquire();
@@ -88,16 +97,31 @@ public class Car extends Thread{
                     naAreaCritica = false; // Indica que o carro saiu da área crítica
                     Log.d("Car", "Saiu da área crítica.");
                 }
+
                 calcularDistanciaPercorrida();
 
                 // Pausa para simular a atualização da posição em intervalos
                 Thread.sleep(50);
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 break; // Encerra a thread em caso de interrupção
             }
         }
     }
+
+    // Métodos para controle de pausa e retomada
+    public void pauseCar() {
+        paused = true;
+    }
+
+    public void resumeCar() {
+        paused = false;
+        synchronized (this) {
+            this.notify(); // Retoma a thread
+        }
+    }
+
 
     public void moverCarro() {
         //Calcula o centro de massa da área mapeada a frente do carro
@@ -197,7 +221,7 @@ public class Car extends Thread{
 
         for (Car outroCarro : carrosCopia) {
             if (outroCarro != this) {
-                double distancia = calcularDistancia(this, outroCarro);
+                double distancia = Calculos.calcularDistancia(this.getX(), this.getY(), outroCarro.getX(), outroCarro.getY());
                 double dx = outroCarro.getX() - this.getX();
                 double dy = outroCarro.getY() - this.getY();
 
@@ -205,7 +229,7 @@ public class Car extends Thread{
                     this.penalidade++;
                     outroCarro.penalidade++;
 
-                    double distanciaEntreCarros = Math.sqrt(dx * dx + dy * dy);
+                    double distanciaEntreCarros = Calculos.calcularDistancia(this.getX(), this.getY(), outroCarro.getX(), outroCarro.getY());
                     double sobreposicao = distanciaMinima - distanciaEntreCarros;
 
                     if (sobreposicao > 0) {
@@ -263,8 +287,6 @@ public class Car extends Thread{
                 this.y < CRITICAL_AREA_START_Y || this.y > CRITICAL_AREA_END_Y;
     }
 
-
-
     private boolean carroSaiuDaPista(Car carro, Bitmap pistaBitmap) {
         int x = carro.x + carro.carroBitmap.getWidth() / 2;
         int y = carro.y + carro.carroBitmap.getHeight() / 2;
@@ -276,27 +298,7 @@ public class Car extends Thread{
         return pistaBitmap.getPixel(x, y) == Color.BLACK;
     }
 
-    //Método auxiliar para calcular a distância entre dois carros
-    private double calcularDistancia(Car carro1, Car carro2) {
-        return Math.sqrt(Math.pow(carro1.x - carro2.x, 2) + Math.pow(carro1.y - carro2.y, 2));
-    }
-
-    //Método para reposicionar os carros após uma colisão
-    private void reposicionarCarros(Car carro1, Car carro2, int distanciaMinima) {
-        // Calcula o vetor entre os carros
-        double dx = carro2.x - carro1.x;
-        double dy = carro2.y - carro1.y;
-        double angulo = Math.atan2(dy, dx);
-
-        // Calcula as novas posições para evitar a sobreposição
-        double novaPosicaoX1 = carro2.x - distanciaMinima * Math.cos(angulo);
-        double novaPosicaoY1 = carro2.y - distanciaMinima * Math.sin(angulo);
-
-        carro1.x = (int) novaPosicaoX1;
-        carro1.y = (int) novaPosicaoY1;
-    }
-
-    private void ajustarVelocidade() {
+    protected void ajustarVelocidade() {
         // Ajusta a velocidade gradualmente em direção à velocidade alvo,
         // mas limita à velocidade máxima.
 
@@ -307,17 +309,9 @@ public class Car extends Thread{
         }
     }
 
-    private boolean colisao(Car carro1, Car carro2) {
-        return carro1.getX() < carro2.getX() + carro2.getLargura()-10 &&
-                carro1.getX() + carro1.getLargura()-10 > carro2.getX() &&
-                carro1.getY() < carro2.getY() + carro2.getAltura()-10 &&
-                carro1.getY() + carro1.getAltura()-10 > carro2.getY();
-    }
-
-
     public void calcularDistanciaPercorrida() {
         //Calcula a distancia percorrida com base no princípio da distancia entre dois pontos
-        distanciaPercorrida += (int)(Math.sqrt(Math.pow(x - xAnterior, 2) + Math.pow(y - yAnterior, 2)));
+        distanciaPercorrida += (int) Calculos.calcularDistancia(x, y,xAnterior,yAnterior);
     }
 
     private void criarSensores() {
@@ -403,6 +397,9 @@ public class Car extends Thread{
     public int getPenalidade() {
         return penalidade;
     }
+    public int getCorOriginalCarro() {
+        return corOriginalCarro;
+    }
     public void setX(int x) {
         this.x = x;
     }
@@ -456,7 +453,7 @@ public class Car extends Thread{
         this.angulo = angulo;
     }
 
-    public Object getAngulo() {
+    public double getAngulo() {
         return angulo;
     }
 
@@ -492,7 +489,7 @@ public class Car extends Thread{
         return mainActivity;
     }
 
-    public double getDistanciaPercorrida() {
+    public int getDistanciaPercorrida() {
         return distanciaPercorrida;
     }
 
@@ -511,4 +508,5 @@ public class Car extends Thread{
     public int getOriginalColor() {
         return corOriginalCarro;
     }
+    
 }

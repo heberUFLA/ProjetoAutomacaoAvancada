@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ProjetoAutomacaoAvancada"
 include(":app")
- 
+include(":bibliotecaAvancada")
