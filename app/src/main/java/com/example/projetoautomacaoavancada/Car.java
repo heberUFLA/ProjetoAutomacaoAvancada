@@ -7,11 +7,8 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.util.Log;
-
 import com.example.bibliotecaavancada.Calculos;
-
 import java.util.concurrent.Semaphore;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,7 +47,8 @@ public class Car extends Thread{
     private boolean paused;
 
 
-    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap, double angulo, int velocidade,int IDcorCarro, Bitmap pista, MainActivity main) {
+    public Car(String name, int x, int y, int carSize,Bitmap carroBitmap,
+               double angulo, int velocidade,int IDcorCarro, Bitmap pista, MainActivity main) {
         this.name = name;
         this.x = x;
         this.y = y;
@@ -77,20 +75,16 @@ public class Car extends Thread{
                         wait(); // Pausa a thread enquanto o carro estiver em estado de pausa
                     }
                 }
-
                 // Verifica se o carro deve entrar na área crítica e obtém permissão
                 if (!naAreaCritica && deveEntrarNaAreaCritica()) {
                     areaCriticaSemaphore.acquire();
                     naAreaCritica = true; // Indica que o carro está na área crítica
                     Log.d("Car", "Entrou na área crítica.");
                 }
-
                 // Atualiza a posição do carro
                 moverCarro();
-
                 // Verifica colisões após a atualização de posição
                 resolverColisao();
-
                 // Verifica se o carro saiu da área crítica para liberar o semáforo
                 if (naAreaCritica && saiuDaAreaCritica()) {
                     areaCriticaSemaphore.release();
@@ -125,7 +119,7 @@ public class Car extends Thread{
 
     public void moverCarro() {
         //Calcula o centro de massa da área mapeada a frente do carro
-        int[] centroMassa = calcularCentroMassa();
+        int[] centroMassa = centroDeMassa();
         //Log.e("COORDS CENTROIDE", "COORDS CENTROIDE: " + centroMassa[0] + " " + centroMassa[1] );
 
         //desenharCentroMassa(canvas, centroMassa[0], centroMassa[1]);
@@ -136,35 +130,28 @@ public class Car extends Thread{
         xAnterior = x;
         yAnterior = y;
 
-        ajustarVelocidade();// Passa a velocidade alvo para
+        velocidade = Calculos.ajustarVelocidade(velocidade,velocidadeAlvo,velocidadeMaxima);// Passa a velocidade alvo para
 
         //Atualiza a coordenada do carro
         x += Math.cos(angulo) * velocidade;
         y += Math.sin(angulo) * velocidade;
     }
 
-    private int[] calcularCentroMassa() {
+    private int[] centroDeMassa(){
+        List<int[]> sensoresCoords = new ArrayList<>();
+        List<Integer> sensoresPesos = new ArrayList<>();
+        List<Integer> pixelsPista = new ArrayList<>();
 
-        int somaX = 0, somaY = 0, validos = 0;
-        //acessa a coordenada do sensor e verifica se a cor do pixel não é preta
         for (Sensor sensor : sensores) {
-            int[] coordSensor =sensor.getSensorCoords(x, y, angulo, carSize, pista);
-            int peso=sensor.getDistSensorDinam();
-            int pixel = pista.getPixel(coordSensor[0], coordSensor[1]);
-            // Log.e("COORDS SENSOR", "COORDS SENSOR: " + coordSensor[0] + " " + coordSensor[1] + " " + pixel);
-            if (pixel != Color.BLACK) {  // Sensor detecta pista válida
-                somaX += (coordSensor[0]*peso);
-                somaY += (coordSensor[1]*peso);
-                validos+=peso;
-            }
+            int[] coord = sensor.getSensorCoords(x, y, angulo, carSize, pista);
+            sensoresCoords.add(coord);
+            sensoresPesos.add(sensor.getDistSensorDinam());
+            pixelsPista.add(pista.getPixel(coord[0], coord[1]));
         }
 
-        if (validos > 0) {
-            return new int[]{somaX / validos, somaY / validos};
-        } else {
-            // Se nenhum sensor detectar, mantém o carro na mesma direção
-            return new int[]{x + carSize / 2, y + carSize / 2};
-        }
+        return Calculos.calcularCentroMassa(sensoresCoords, sensoresPesos, x, y, carSize, pixelsPista);
+
+
     }
 
     private void rotacionarCarroParaCentroMassa(int[] centroMassa) {
@@ -296,17 +283,6 @@ public class Car extends Thread{
         }
         // Verifica se o centro do carro está em um pixel preto (fora da pista)
         return pistaBitmap.getPixel(x, y) == Color.BLACK;
-    }
-
-    protected void ajustarVelocidade() {
-        // Ajusta a velocidade gradualmente em direção à velocidade alvo,
-        // mas limita à velocidade máxima.
-
-        if (velocidade < velocidadeAlvo) {
-            velocidade = Math.min(velocidade + 1, velocidadeMaxima); // Limita a velocidadeMaxima
-        } else if (velocidade > velocidadeAlvo) {
-            velocidade = Math.max(velocidade - 1, 0); // Limita a velocidade mínima a 0
-        }
     }
 
     public void calcularDistanciaPercorrida() {

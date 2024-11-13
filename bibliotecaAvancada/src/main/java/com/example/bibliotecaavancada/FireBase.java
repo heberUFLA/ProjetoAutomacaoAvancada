@@ -5,27 +5,16 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.util.Base64;
 import android.util.Log;
-
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
-import android.util.Base64;
-import android.util.Log;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
 
 public class FireBase {
 
@@ -51,8 +40,6 @@ public class FireBase {
             }else{
                 carData.put("isSafetCar", "não");
             }
-
-
             db.collection("corridaEstado").document(es.getNome())
                     .set(carData)
                     .addOnSuccessListener(aVoid -> Log.d("Firestore", "Car state saved: " + es.getNome()))
@@ -87,9 +74,7 @@ public class FireBase {
                             if(document.getString("isSafetCar")=="sim"){
                                 isSafetCar = true;
                             }
-
                             EstadosCar estadosTemp = new EstadosCar(name,x,y,tamanho,carroBitmap,angulo,velocidade,color,voltasCompletadas,distanciaPercorrida,penalidade,isSafetCar);
-
                             estadosCars.add(estadosTemp);
                         }
                         Log.d("Firestore", "Estados dos carros carregados com sucesso.");
@@ -101,32 +86,30 @@ public class FireBase {
                 });
     }
 
-    public interface OnCarrosLoadedCallback {
-        void onCarrosLoaded(List<EstadosCar> estadosCars);
-    }
-
     public static void limparDadosCorrida(OnCompleteListener<Void> onCompleteListener) {
         db.collection("corridaEstado")
                 .get()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        // Limpar os dados
-                        db.collection("corridaEstado")
-                                .get()
-                                .addOnCompleteListener(deleteTask -> {
-                                    if (deleteTask.isSuccessful()) {
-                                        onCompleteListener.onComplete(Tasks.forResult(null));  // Dados deletados com sucesso
-                                    } else {
-                                        // Caso de erro, passamos a Task com erro
-                                        onCompleteListener.onComplete(Tasks.forException(deleteTask.getException()));
-                                    }
-                                });
+                        // Iterar sobre os documentos e deletar cada um
+                        for (DocumentSnapshot document : task.getResult()) {
+                            document.getReference().delete();
+                        }
+                        // Passar sucesso após deletar todos os documentos
+                        onCompleteListener.onComplete(Tasks.forResult(null));
                     } else {
-                        // Caso de erro na busca inicial
+                        // Caso de erro na busca dos dados
                         onCompleteListener.onComplete(Tasks.forException(task.getException()));
                     }
                 });
     }
+
+    public interface OnCarrosLoadedCallback {
+        void onCarrosLoaded(List<EstadosCar> estadosCars);
+    }
+
+
+
     // Converter Bitmap para String Base64
     private static String bitmapToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

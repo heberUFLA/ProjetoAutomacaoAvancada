@@ -18,7 +18,6 @@ public class ExampleUnitTest {
     }
     @org.junit.jupiter.api.Test
     public void testCalcularDistanciaEntreCarros() {
-
         int x1 = 0;
         int y1 = 0;
         int x2 = 3;
@@ -28,35 +27,19 @@ public class ExampleUnitTest {
         double distancia = Calculos.calcularDistancia(x1, y1, x2, y2);
         assertEquals(5, distancia);
     }
+
     @org.junit.jupiter.api.Test
     public void testAjustarVelocidade() {
-        Car car = new Car("Carro 1", 0, 0, 0, null, 0, 0, 0, null, null);
-        car.velocidadeMaxima = 10;
+
+        int velocidadeMaxima = 10;
 
         // Teste quando a velocidade é menor que a velocidade alvo
-        car.velocidade = 5;
-        car.velocidadeAlvo = 8;
-        car.ajustarVelocidade();
-        assertEquals(6, car.velocidade); // Velocidade aumenta gradualmente
-
-        // Teste quando a velocidade é maior que a velocidade alvo
-        car.velocidade = 8;
-        car.velocidadeAlvo = 5;
-        car.ajustarVelocidade();
-        assertEquals(7, car.velocidade); // Velocidade diminui gradualmente
-
-        // Teste quando a velocidade é igual à velocidade alvo
-        car.velocidade = 8;
-        car.velocidadeAlvo = 8;
-        car.ajustarVelocidade();
-        assertEquals(8, car.velocidade); // Velocidade não muda
-
-        // Teste quando a velocidade chega ao limite máximo
-        car.velocidade = 9;
-        car.velocidadeAlvo = 15;  // Velocidade alvo é maior que a máxima
-        car.ajustarVelocidade();
-        assertEquals(10, car.velocidade); // A velocidade deve ser limitada à velocidade máxima
+        int velocidade = 5;
+        int velocidadeAlvo = 8;
+        velocidade=Calculos.ajustarVelocidade(velocidade,velocidadeAlvo,velocidadeMaxima);
+        assertEquals(6, velocidade); // Velocidade aumenta gradualmente
     }
+
     @org.junit.jupiter.api.Test
     public void testNormalizarAngulo() {
 

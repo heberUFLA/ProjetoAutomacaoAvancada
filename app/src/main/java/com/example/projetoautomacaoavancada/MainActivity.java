@@ -12,12 +12,9 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.graphics.Paint;
-
 import androidx.annotation.NonNull;
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -28,10 +25,10 @@ import com.example.bibliotecaavancada.FireBase;
 public class MainActivity extends Activity {
     private ImageView pistaImageView;
     private TextView cronometroTextView, voltasTextView, carrosEditText, rankingTextView;
-    private Button startButton, pauseButton, finishButton;
+    private Button startButton, pauseButton, finishButton, resetButton;
     private List<Car> carros = new ArrayList<>();
     private int startX = 1400;
-    private int startY = 1800;
+    private int startY = 1870;
     private int carSize = 40;
     private boolean isRunning = false;
     private Bitmap pistaBitmap, mutablePistaBitmap,originalCarroBitmap,auxBitmap;
@@ -39,10 +36,7 @@ public class MainActivity extends Activity {
     private Thread simulationThread;
     private long startTime;  // Armazena o tempo de início da corrida
     private double anguloInicial = 0;
-
     private List<EstadosCar> copiaEstadosCar = new ArrayList<>();
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +53,7 @@ public class MainActivity extends Activity {
         startButton = findViewById(R.id.startButton);
         pauseButton = findViewById(R.id.pauseButton);
         finishButton = findViewById(R.id.finishButton);
+        resetButton = findViewById(R.id.resetButton);
         inicializarPista();
         // Carrega o bitmap aqui para garantir que não está nulo
         originalCarroBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.carro);
@@ -67,6 +62,7 @@ public class MainActivity extends Activity {
         startButton.setOnClickListener(v -> startRace());
         pauseButton.setOnClickListener(v -> pauseRace());
         finishButton.setOnClickListener(v -> finishRace());
+        resetButton.setOnClickListener ( v-> resetRace());
     }
 
     private void startRace() {
@@ -147,7 +143,6 @@ public class MainActivity extends Activity {
         if(index==0){
             SafetCar novoCarro = new SafetCar("Carro Seguro ", posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
             carros.add(novoCarro);
-            novoCarro.setPriority(Thread.MAX_PRIORITY);
             novoCarro.start();
         }
         Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
@@ -180,10 +175,8 @@ public class MainActivity extends Activity {
         }
     }
 
-
     private void finishRace() {
         isRunning = false;
-        resetarCronometro();
         for (Car carro : carros){
             carro.interrupt();
             carro.liberarSemaforos();
@@ -206,6 +199,33 @@ public class MainActivity extends Activity {
 
                     // Limpar a lista de carros e redesenhar a pista
                     carros.clear();
+                    cronometroTextView.setText("Tempo: 00:00");
+                    voltasTextView.setText("Voltas: 0");
+                    rankingTextView.setText("Ranking:\n");
+                    inicializarPista();
+                } else {
+                    Log.e("Firestore", "Erro ao limpar dados antes de salvar os novos.", task.getException());
+                }
+            }
+        });
+    }
+    private void resetRace() {
+        // Limpar dados no Firestore antes de salvar novos dados
+        FireBase.limparDadosCorrida(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                if (task.isSuccessful()) {
+                    Log.d("Firestore", "Dados antigos limpos com sucesso!");
+
+                    // Agora que os dados foram excluídos, podemos salvar o estado dos carros
+
+                    // Limpar a lista de carros e redesenhar a pista
+                    isRunning = false;
+                    carros.clear();
+                    copiaEstadosCar.clear();
+                    cronometroTextView.setText("Tempo: 00:00");
+                    voltasTextView.setText("Voltas: 0");
+                    rankingTextView.setText("Ranking:\n");
                     inicializarPista();
                 } else {
                     Log.e("Firestore", "Erro ao limpar dados antes de salvar os novos.", task.getException());
@@ -267,10 +287,10 @@ public class MainActivity extends Activity {
 
         // Monta o texto do ranking
         StringBuilder ranking = new StringBuilder("Ranking:\n");
-        for (int i = 0; i < carros.size(); i++) {
+        for (int i = 0; i < 3; i++) {
             Car carro = carros.get(i);
             ranking.append((i + 1)).append("º ").append(carro.getNome())
-                    .append(": ").append(carro.getVoltasCompletadas()).append(" voltas, Speed: ").append(carro.getVelocidade()).append(", Penalidade: ").append(carro.getPenalidade()).append("\n");
+                    .append(": ").append(carro.getVoltasCompletadas()).append(" voltas, Speed: ").append(carro.getVelocidade()).append("\n");
         }
 
         rankingTextView.setText(ranking.toString());
