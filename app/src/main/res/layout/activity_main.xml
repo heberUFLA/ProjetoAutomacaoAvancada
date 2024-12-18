@@ -65,6 +65,13 @@
             android:text="Finish" />
 
     </LinearLayout>
+    <Button
+        android:id="@+id/resetButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reset"
+        android:layout_margin="16dp"
+        android:layout_gravity="center" />
 
     <EditText
         android:id="@+id/carrosEditText"
@@ -79,17 +86,13 @@
         android:text="Ranking:"
         android:textSize="18sp"
         android:layout_marginTop="16dp"/>
-    <Button
-        android:id="@+id/resetButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Reset"
-        android:layout_margin="16dp"
-        android:layout_gravity="center" />
+
 
 
 
 </LinearLayout>
+
+
 
 
 

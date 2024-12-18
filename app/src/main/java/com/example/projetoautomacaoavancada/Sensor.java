@@ -47,6 +47,7 @@ public class Sensor {
 
     public int[] atualizaSensorCoords(int[] coordCentroCarro, double anguloAbsoluto, Bitmap tempBitmap) {
 
+        //Log.e("CORDS PISTA", "Altura: "+tempBitmap.getHeight()+ " Largura: "+tempBitmap.getWidth());
         distSensorDinam=distSensor;
         limite = true;
         int pixel = tempBitmap.getPixel(sensorCoords[0], sensorCoords[1]);

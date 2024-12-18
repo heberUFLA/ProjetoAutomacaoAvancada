@@ -27,9 +27,9 @@ public class MainActivity extends Activity {
     private TextView cronometroTextView, voltasTextView, carrosEditText, rankingTextView;
     private Button startButton, pauseButton, finishButton, resetButton;
     private List<Car> carros = new ArrayList<>();
-    private int startX = 1400;
-    private int startY = 1870;
-    private int carSize = 40;
+    private int startX = 1150;//1400;
+    private int startY = 1650; //1870;
+    private int carSize = 25;
     private boolean isRunning = false;
     private Bitmap pistaBitmap, mutablePistaBitmap,originalCarroBitmap,auxBitmap;
     private Canvas canvas;
@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
                             }
                         }
                         if (carros.size() < numCarros) {
-                            for (int i = carros.size(); i < numCarros; i++) {
+                            for (int i = 0; i <= numCarros-carros.size(); i++) {
                                 adicionarCarro(i);
                             }
                         }
@@ -127,25 +127,21 @@ public class MainActivity extends Activity {
     }
     private void adicionarCarro(int index) {
         int posX = startX - (index / 2) * 50; // Alterna entre 2 filas
-        int posY = startY - (index % 2) * 30;  // Desloca para cima para a segunda fila
+        int posY = startY - (index % 2) * 70;  // Desloca para cima para a segunda fila
 
         //Velocidade aleatória para cada carro criado no inicio
-        int velocidade = (int) (Math.random() * (40 - 15) + 15);
+        int velocidade = (int) (Math.random() * (25 - 15) + 15);
 
         //Redimensiona o bitmap do carro para o tamanho desejado
         Bitmap auxBitmap = Bitmap.createScaledBitmap(originalCarroBitmap, carSize, carSize, false);
 
 
-        //Cria o objeto carro, Passando como parâmetro Nome (pega o número do for onde está sendo criado os carros), a posição inicial X e Y,
-
-        // tamanho do carro que inicialmente pega o valor original da imagem do carro, bitmap do carro, angulo inicial e velocidade e a cor gerada aleatoriamente.
-
-        if(index==0){
-            SafetCar novoCarro = new SafetCar("Carro Seguro ", posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
-            carros.add(novoCarro);
-            novoCarro.start();
-        }
-        Car novoCarro = new Car("Carro " + (index + 1), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
+//        if(carros.size()==0){
+//            SafetCar novoCarro = new SafetCar("Carro Seguro ", posX+50, posY-30, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
+//           carros.add(novoCarro);
+//           novoCarro.start();
+//        }
+        Car novoCarro = new Car("Carro " + (carros.size()), posX, posY, carSize, auxBitmap, anguloInicial,velocidade,getRandomColor(),pistaBitmap,this);
 
 
         //Adiciona o carro à lista de carros
@@ -177,6 +173,8 @@ public class MainActivity extends Activity {
 
     private void finishRace() {
         isRunning = false;
+
+
         for (Car carro : carros){
             carro.interrupt();
             carro.liberarSemaforos();
@@ -201,7 +199,6 @@ public class MainActivity extends Activity {
                     carros.clear();
                     cronometroTextView.setText("Tempo: 00:00");
                     voltasTextView.setText("Voltas: 0");
-                    rankingTextView.setText("Ranking:\n");
                     inicializarPista();
                 } else {
                     Log.e("Firestore", "Erro ao limpar dados antes de salvar os novos.", task.getException());
@@ -225,7 +222,6 @@ public class MainActivity extends Activity {
                     copiaEstadosCar.clear();
                     cronometroTextView.setText("Tempo: 00:00");
                     voltasTextView.setText("Voltas: 0");
-                    rankingTextView.setText("Ranking:\n");
                     inicializarPista();
                 } else {
                     Log.e("Firestore", "Erro ao limpar dados antes de salvar os novos.", task.getException());
@@ -287,13 +283,15 @@ public class MainActivity extends Activity {
 
         // Monta o texto do ranking
         StringBuilder ranking = new StringBuilder("Ranking:\n");
-        for (int i = 0; i < 3; i++) {
+        int tamanhoRanking = Math.min(carros.size(), 3); // Garante que o loop não ultrapasse o tamanho da lista
+        for (int i = 0; i < tamanhoRanking; i++) {
             Car carro = carros.get(i);
             ranking.append((i + 1)).append("º ").append(carro.getNome())
-                    .append(": ").append(carro.getVoltasCompletadas()).append(" voltas, Speed: ").append(carro.getVelocidade()).append("\n");
+                    .append(": ").append(carro.getVoltasCompletadas()).append(" voltas, Speed: ").append(carro.getVelocidade()).append(", Deslocamento: ").append(carro.getDistanciaPercorrida()).append("\n");
         }
 
         rankingTextView.setText(ranking.toString());
+
     }
 
     private void atualizarVoltas() {
@@ -319,10 +317,21 @@ public class MainActivity extends Activity {
 
         for (Car carro : carros) {
             // Se o carro passar pelo ponto de partida e completou uma volta
-            if (Math.abs(carro.getX() - startX) < 40 && Math.abs(carro.getY() - startY) < 300) {
+            if (Math.abs(carro.getX() - startX) < 30 && Math.abs(carro.getY() - startY) < 300) {
                 if (!carro.getCruzouLinha()) {  // Verifica se o carro já contou uma volta nesta passagem
                     carro.setVoltasCompletadas(carro.getVoltasCompletadas() + 1);  // Incrementa o contador de voltas
                     carro.setCruzouLinha(true);  // Marca que essa volta foi contada
+                    carro.setDistanciaPercorrida(0);
+                    //Log.d("Deadline",   carro.getNome()+ " - Tempo de Volta: " + carro.getSegundosDecorrido() + " segundos");
+                    carro.setStartTime2(System.currentTimeMillis());
+
+                    // Log dos tempos
+                    Log.d("MOVER_CARRO", "Nucleos: " + carro.getNumNucleos());
+                    Log.d("MOVER_CARRO", "Tarefa 1 (ns): " + carro.getTempoTarefa1());
+                    Log.d("MOVER_CARRO", "Tarefa 2 (ns): " + carro.getTempoTarefa2());
+                    Log.d("MOVER_CARRO", "Tarefa 3 (ns): " + carro.getTempoTarefa3());
+                    Log.d("MOVER_CARRO", "Tarefa 4 (ns): " + carro.getTempoTarefa4());
+
                 }
             } else {
                 carro.setCruzouLinha(false);  // Prepara para contar a próxima volta
@@ -331,10 +340,11 @@ public class MainActivity extends Activity {
     }
 
     private void inicializarPista() {
-        pistaBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.pista3);
+        pistaBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.teste);
         mutablePistaBitmap = pistaBitmap.copy(Bitmap.Config.ARGB_8888, true);
         canvas = new Canvas(mutablePistaBitmap);
         desenharLinhaChegada(canvas, mutablePistaBitmap);
+        Log.d("Pista", "Largura da pista: " + pistaBitmap.getWidth()+ " Altura da pista: " + pistaBitmap.getHeight());
     }
 
     private void desenharLinhaChegada(Canvas canvas, Bitmap mutablePistaBitmap){
@@ -345,11 +355,20 @@ public class MainActivity extends Activity {
         Paint paint2 = new Paint();
         paint2.setColor(Color.GREEN);
         paint2.setStrokeWidth(10);
+        Paint paint3 = new Paint();
+        paint3.setColor(Color.RED);
+        paint3.setStrokeWidth(10);
+        int xLine = 1250;  // Coordenada X fixa para a linha vertical
+        canvas.drawLine(xLine, 1550, xLine, 1720, paint);
+        canvas.drawLine(700, 70, 700, 270, paint2);
+        canvas.drawLine(1000, 70, 1000, 270, paint2);
+        canvas.drawLine(1400, 70, 1400, 270, paint3);
 
-        int xLine = 1550;  // Coordenada X fixa para a linha vertical
-        canvas.drawLine(xLine, 1800, xLine, 1990, paint);
-        canvas.drawLine(1000, 1800, 1000, 1990, paint2);
-        canvas.drawLine(1200, 1800, 1200, 1990, paint2);
+
+//        int xLine = 1550;  // Coordenada X fixa para a linha vertical
+//        canvas.drawLine(xLine, 1800, xLine, 1990, paint);
+//        canvas.drawLine(1000, 1800, 1000, 1990, paint2);
+//        canvas.drawLine(1200, 1800, 1200, 1990, paint2);
 
         pistaImageView.setImageBitmap(mutablePistaBitmap);
     }
@@ -361,5 +380,6 @@ public class MainActivity extends Activity {
     public List<Car> getCarros() {
         return carros; // Retorna a lista de carros
     }
+
 
 }

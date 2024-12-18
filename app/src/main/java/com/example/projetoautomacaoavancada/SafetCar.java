@@ -7,7 +7,7 @@ import android.util.Log;
 public class SafetCar extends Car {
     private static final int VELOCIDADE_CONSTANTE = 1; // Velocidade constante mais alta
     private static final int COR_SAFE_CAR = Color.BLACK;// Cor predefinida para SafeCar
-    private final int velocidadeConstante = 5;
+    private final int velocidadeConstante = 20;
 
     public SafetCar(String nome, int x, int y, int tamanho, Bitmap bitmap, double angulo, int velocidade, int cor, Bitmap pista, MainActivity mainActivity) {
         super(nome, x, y, tamanho, bitmap, angulo, velocidade, COR_SAFE_CAR, pista, mainActivity);
